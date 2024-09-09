@@ -9,44 +9,73 @@ import (
 
 func GetMessages(w http.ResponseWriter, r *http.Request) {
 	var messages []Message
-	result := DB.Find(&messages)
-
-	if result.Error != nil {
-		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
-		return
-	}
-
+	DB.Find(&messages)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(messages)
 }
 
 func CreateMessage(w http.ResponseWriter, r *http.Request) {
 	var message Message
-
-	err := json.NewDecoder(r.Body).Decode(&message)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	result := DB.Create(&message)
-	if result.Error != nil {
-		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
-		return
-	}
-
+	json.NewDecoder(r.Body).Decode(&message)
+	DB.Create(&message)
 	w.Header().Set("Content-Type", "application/json")
 	response := map[string]string{"message": "Message created successfully!"}
 	json.NewEncoder(w).Encode(response)
 }
 
-func main() {
-	InitDB() // Инициализация базы данных
+func UpdateMessage(w http.ResponseWriter, r *http.Request) {
+	var message Message
+	vars := mux.Vars(r)
+	id := vars["id"]
 
-	DB.AutoMigrate(&Message{}) // Автоматическая миграция модели Message
+	if err := DB.First(&message, id).Error; err != nil {
+		http.Error(w, "Message not found", http.StatusNotFound)
+		return
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&message); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	if err := DB.Save(&message).Error; err != nil {
+		http.Error(w, "Failed to update message", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{"message": "Message updated successfully!"}
+	json.NewEncoder(w).Encode(response)
+}
+
+func DeleteMessage(w http.ResponseWriter, r *http.Request) {
+	var message Message
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	if err := DB.First(&message, id).Error; err != nil {
+		http.Error(w, "Message not found", http.StatusNotFound)
+		return
+	}
+
+	if err := DB.Delete(&message).Error; err != nil {
+		http.Error(w, "Failed to delete message", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{"message": "Message deleted successfully!"}
+	json.NewEncoder(w).Encode(response)
+}
+
+func main() {
+	InitDB()
+	DB.AutoMigrate(&Message{})
 
 	router := mux.NewRouter()
 	router.HandleFunc("/api/messages", CreateMessage).Methods("POST")
 	router.HandleFunc("/api/messages", GetMessages).Methods("GET")
+	router.HandleFunc("/api/messages/{id:[0-9]+}", UpdateMessage).Methods("PATCH")
+	router.HandleFunc("/api/messages/{id:[0-9]+}", DeleteMessage).Methods("DELETE")
 	http.ListenAndServe(":8080", router)
 }
