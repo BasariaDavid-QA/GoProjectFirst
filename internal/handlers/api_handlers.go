@@ -16,15 +16,6 @@ func NewHandler(service *messagesService.MessageService) *Handler {
 	}
 }
 
-// Helper function to convert *uint to *int
-func uintToIntPtr(u *uint) *int {
-	if u == nil {
-		return nil
-	}
-	i := int(*u)
-	return &i
-}
-
 // Helper function to convert uint to int
 func uintToInt(u uint) int {
 	return int(u)
