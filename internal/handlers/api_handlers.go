@@ -1,90 +1,98 @@
 package handlers
 
 import (
-	"encoding/json"
-	"net/http"
+	"context"
 	"new-go-project/internal/messagesService"
-	"strconv"
-
-	"github.com/gorilla/mux"
+	"new-go-project/internal/web/messages"
 )
 
 type Handler struct {
 	Service *messagesService.MessageService
 }
 
-// Конструктор для Handler
 func NewHandler(service *messagesService.MessageService) *Handler {
 	return &Handler{
 		Service: service,
 	}
 }
 
-func (h *Handler) GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
-	messages, err := h.Service.GetAllMessages()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+// Helper function to convert *uint to *int
+func uintToIntPtr(u *uint) *int {
+	if u == nil {
+		return nil
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(messages)
+	i := int(*u)
+	return &i
 }
 
-func (h *Handler) PostMessageHandler(w http.ResponseWriter, r *http.Request) {
-	var message messagesService.Message
-	err := json.NewDecoder(r.Body).Decode(&message)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	createdMessage, err := h.Service.CreateMessage(message)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(createdMessage)
+// Helper function to convert uint to int
+func uintToInt(u uint) int {
+	return int(u)
 }
 
-func (h *Handler) PatchMessageHandler(w http.ResponseWriter, r *http.Request) {
-	var newPatch messagesService.Message
-	err := json.NewDecoder(r.Body).Decode(&newPatch)
+func (h *Handler) GetMessages(_ context.Context, _ messages.GetMessagesRequestObject) (messages.GetMessagesResponseObject, error) {
+	// Получение всех сообщений из сервиса
+	allMessages, err := h.Service.GetAllMessages()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil, err
 	}
 
-	// Извлекаем ID из URL
-	vars := mux.Vars(r)
-	idStr := vars["id"]
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+	// Создаем переменную респон типа 200джейсонРеспонс
+	// Которую мы потом передадим в качестве ответа
+	response := messages.GetMessages200JSONResponse{}
+
+	// Заполняем слайс response всеми сообщениями из БД
+	for _, msg := range allMessages {
+		message := messages.Message{
+			Id:      &msg.ID,
+			Message: &msg.Text,
+		}
+		response = append(response, message)
 	}
 
-	updatedMessage, err := h.Service.UpdateMessageByID(id, newPatch)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(updatedMessage)
+	// САМОЕ ПРЕКРАСНОЕ. Возвращаем просто респонс и nil!
+	return response, nil
 }
 
-func (h *Handler) DeleteMessageHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
+func (h *Handler) PostMessages(_ context.Context, request messages.PostMessagesRequestObject) (messages.PostMessagesResponseObject, error) {
+	// Распаковываем тело запроса напрямую, без декодера!
+	messageRequest := request.Body
+	// Обращаемся к сервису и создаем сообщение
+	messageToCreate := messagesService.Message{Text: *messageRequest.Message}
+	createdMessage, err := h.Service.CreateMessage(messageToCreate)
+
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
+		return nil, err
 	}
-	err = h.Service.DeleteMessageByID(id)
+	// создаем структуру респонс
+	response := messages.PostMessages201JSONResponse{
+		Id:      &createdMessage.ID,
+		Message: &createdMessage.Text,
+	}
+	// Просто возвращаем респонс!
+	return response, nil
+}
+
+func (h *Handler) PatchMessages(_ context.Context, request messages.PatchMessagesRequestObject) (messages.PatchMessagesResponseObject, error) {
+	id := uintToInt(*request.Body.Id) // Convert *int to uint
+	messageUpdate := messagesService.Message{Text: *request.Body.Message}
+	updatedMessage, err := h.Service.UpdateMessageByID(id, messageUpdate)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
-	w.WriteHeader(http.StatusNoContent)
+	response := messages.PatchMessages200JSONResponse{
+		Id:      &updatedMessage.ID, // Convert *uint to *int
+		Message: &updatedMessage.Text,
+	}
+	return response, nil
+}
+
+func (h *Handler) DeleteMessages(_ context.Context, request messages.DeleteMessagesRequestObject) (messages.DeleteMessagesResponseObject, error) {
+	id := uint(request.Params.Id) // Convert int to uint
+	err := h.Service.DeleteMessageByID(uintToInt(id))
+	if err != nil {
+		return nil, err
+	}
+
+	return &messages.DeleteMessages204Response{}, nil
 }
