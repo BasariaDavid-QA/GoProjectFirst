@@ -5,35 +5,37 @@ import (
 	"new-go-project/internal/database"
 	"new-go-project/internal/handlers"
 	"new-go-project/internal/messagesService"
-	"new-go-project/internal/web/messages"
+	"new-go-project/userService"
 
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 )
 
 func main() {
 	database.InitDB()
-	if err := database.DB.AutoMigrate(&messagesService.Message{}); err != nil {
+	if err := database.DB.AutoMigrate(&messagesService.Message{}, &userService.User{}); err != nil {
 		log.Fatalf("AutoMigrate failed: %v", err)
 	}
 
-	repo := messagesService.NewMessageRepository(database.DB)
-	service := messagesService.NewService(repo)
+	messageRepo := messagesService.NewMessageRepository(database.DB)
+	messageService := messagesService.NewMessageService(messageRepo)
 
-	handler := handlers.NewHandler(service)
+	messageHandler := handlers.MessageHandler{Service: messageService}
 
-	// Инициализируем echo
+	userRepo := userService.NewUserRepository(database.DB)
+	userService := userService.NewUserService(userRepo)
+	userHandler := handlers.UserHandler{Service: userService}
+
 	e := echo.New()
 
-	// используем Logger и Recover
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
+	e.GET("/messages", messageHandler.GetMessages)
+	e.POST("/messages", messageHandler.PostMessages)
+	e.PATCH("/messages/:id", messageHandler.PatchMessages)
+	e.DELETE("/messages/:id", messageHandler.DeleteMessages)
 
-	// Прикол для работы в echo. Передаем и регистрируем хендлер в echo
-	strictHandler := messages.NewStrictHandler(handler, nil) // тут будет ошибка
-	messages.RegisterHandlers(e, strictHandler)
+	e.GET("/users", userHandler.GetUsers)
+	e.POST("/users", userHandler.PostUsers)
+	e.PATCH("/users/:id", userHandler.PatchUserByID)
+	e.DELETE("/users/:id", userHandler.DeleteUserByID)
 
-	if err := e.Start(":8080"); err != nil {
-		log.Fatalf("failed to start with err: %v", err)
-	}
+	e.Logger.Fatal(e.Start(":8080"))
 }

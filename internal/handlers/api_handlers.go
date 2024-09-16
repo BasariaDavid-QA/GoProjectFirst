@@ -1,38 +1,31 @@
 package handlers
 
 import (
-	"context"
+	"net/http"
 	"new-go-project/internal/messagesService"
 	"new-go-project/internal/web/messages"
+	"strconv"
+
+	"github.com/labstack/echo/v4"
 )
 
-type Handler struct {
+type MessageHandler struct {
 	Service *messagesService.MessageService
 }
 
-func NewHandler(service *messagesService.MessageService) *Handler {
-	return &Handler{
+func NewHandler(service *messagesService.MessageService) *MessageHandler {
+	return &MessageHandler{
 		Service: service,
 	}
 }
 
-// Helper function to convert uint to int
-func uintToInt(u uint) int {
-	return int(u)
-}
-
-func (h *Handler) GetMessages(_ context.Context, _ messages.GetMessagesRequestObject) (messages.GetMessagesResponseObject, error) {
-	// Получение всех сообщений из сервиса
+func (h *MessageHandler) GetMessages(c echo.Context) error {
 	allMessages, err := h.Service.GetAllMessages()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// Создаем переменную респон типа 200джейсонРеспонс
-	// Которую мы потом передадим в качестве ответа
-	response := messages.GetMessages200JSONResponse{}
-
-	// Заполняем слайс response всеми сообщениями из БД
+	var response []messages.Message
 	for _, msg := range allMessages {
 		message := messages.Message{
 			Id:      &msg.ID,
@@ -41,49 +34,72 @@ func (h *Handler) GetMessages(_ context.Context, _ messages.GetMessagesRequestOb
 		response = append(response, message)
 	}
 
-	// САМОЕ ПРЕКРАСНОЕ. Возвращаем просто респонс и nil!
-	return response, nil
+	return c.JSON(http.StatusOK, response)
 }
 
-func (h *Handler) PostMessages(_ context.Context, request messages.PostMessagesRequestObject) (messages.PostMessagesResponseObject, error) {
-	// Распаковываем тело запроса напрямую, без декодера!
-	messageRequest := request.Body
-	// Обращаемся к сервису и создаем сообщение
-	messageToCreate := messagesService.Message{Text: *messageRequest.Message}
-	createdMessage, err := h.Service.CreateMessage(messageToCreate)
-
-	if err != nil {
-		return nil, err
+func (h *MessageHandler) PostMessages(c echo.Context) error {
+	var request messages.PostMessagesRequestObject
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request")
 	}
-	// создаем структуру респонс
+
+	if request.Body.Message == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Message field is required")
+	}
+
+	messageToCreate := messagesService.Message{Text: *request.Body.Message}
+	createdMessage, err := h.Service.CreateMessage(messageToCreate)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create message")
+	}
+
 	response := messages.PostMessages201JSONResponse{
 		Id:      &createdMessage.ID,
 		Message: &createdMessage.Text,
 	}
-	// Просто возвращаем респонс!
-	return response, nil
+	return c.JSON(http.StatusCreated, response)
 }
 
-func (h *Handler) PatchMessages(_ context.Context, request messages.PatchMessagesRequestObject) (messages.PatchMessagesResponseObject, error) {
-	id := uintToInt(*request.Body.Id) // Convert *int to uint
+func (h *MessageHandler) PatchMessages(c echo.Context) error {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid ID")
+	}
+
+	var request messages.PatchMessagesRequestObject
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request")
+	}
+
+	if request.Body.Message == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Message field is required")
+	}
+
 	messageUpdate := messagesService.Message{Text: *request.Body.Message}
 	updatedMessage, err := h.Service.UpdateMessageByID(id, messageUpdate)
 	if err != nil {
-		return nil, err
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to update message")
 	}
+
 	response := messages.PatchMessages200JSONResponse{
-		Id:      &updatedMessage.ID, // Convert *uint to *int
+		Id:      &updatedMessage.ID,
 		Message: &updatedMessage.Text,
 	}
-	return response, nil
+	return c.JSON(http.StatusOK, response)
 }
 
-func (h *Handler) DeleteMessages(_ context.Context, request messages.DeleteMessagesRequestObject) (messages.DeleteMessagesResponseObject, error) {
-	id := uint(request.Params.Id) // Convert int to uint
-	err := h.Service.DeleteMessageByID(uintToInt(id))
+func (h *MessageHandler) DeleteMessages(c echo.Context) error {
+	idStr := c.Param("id")         // Get ID as string
+	id, err := strconv.Atoi(idStr) // Convert string to int
 	if err != nil {
-		return nil, err
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid ID")
 	}
 
-	return &messages.DeleteMessages204Response{}, nil
+	err = h.Service.DeleteMessageByID(id)
+	if err != nil {
+		return err
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }

@@ -6,7 +6,7 @@ type MessageService struct {
 }
 
 // Создание нового сервиса сообщений
-func NewService(repo MessageRepository) *MessageService {
+func NewMessageService(repo MessageRepository) *MessageService {
 	return &MessageService{repo: repo}
 }
 

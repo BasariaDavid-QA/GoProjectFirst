@@ -1,5 +1,3 @@
-# Makefile для создания миграций
-
 # Переменные которые будут использоваться в наших командах (Таргетах)
 DB_DSN := "postgres://postgres:Vasaner12@localhost:5432/postgres?sslmode=disable"
 MIGRATE := migrate -path ./migrations -database $(DB_DSN)
@@ -25,3 +23,6 @@ gen:
 
 lint:
 	golangci-lint run --out-format=colored-line-number
+
+generate-users:
+	oapi-codegen -generate types,server,spec -o internal/handlers/users.go -package handlers openapi/openapi.yaml
