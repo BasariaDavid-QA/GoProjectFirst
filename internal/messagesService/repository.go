@@ -1,57 +1,84 @@
 package messagesService
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+)
 
-// Интерфейс для работы с сообщениями
 type MessageRepository interface {
+	// CreateMessage - возвращаем созданное сообщение и ошибку
 	CreateMessage(message Message) (Message, error)
+
+	// GetAllMessages - Возвращаем массив из всех сообщений в БД и ошибку
 	GetAllMessages() ([]Message, error)
-	UpdateMessageByID(id int, message Message) (Message, error)
-	DeleteMessageByID(id int) error
+
+	// UpdateMessageByID - Передаем id и Message, возвращаем обновленный Message и ошибку
+	UpdateMessageByID(id uint, message Message) (Message, error)
+
+	// DeleteMessageByID - Передаем id для удаления, возвращаем удаленное сообщение и ошибку
+	DeleteMessageByID(id uint) (Message, error)
 }
 
 type messageRepository struct {
 	db *gorm.DB
 }
 
-// Создание нового репозитория сообщений
-func NewMessageRepository(db *gorm.DB) MessageRepository {
+func NewMessageRepository(db *gorm.DB) *messageRepository {
 	return &messageRepository{db: db}
 }
 
-// Создание нового сообщения
-func (r *messageRepository) CreateMessage(message Message) (Message, error) {
-	result := r.db.Create(&message)
-	if result.Error != nil {
-		return Message{}, result.Error
-	}
-	return message, nil
-}
+// (r *messageRepository) привязывает данную функцию к нашему репозиторию
 
-// Получение всех сообщений
 func (r *messageRepository) GetAllMessages() ([]Message, error) {
 	var messages []Message
 	err := r.db.Find(&messages).Error
 	return messages, err
 }
 
-// Обновление сообщения по ID
-func (r *messageRepository) UpdateMessageByID(id int, message Message) (Message, error) {
-	var existingMessage Message
-	if err := r.db.First(&existingMessage, id).Error; err != nil {
-		return Message{}, err
+func (r *messageRepository) CreateMessage(message Message) (Message, error) {
+	createMessage := r.db.Create(&message)
+	if createMessage.Error != nil {
+		return Message{}, createMessage.Error
 	}
-	existingMessage.Text = message.Text
-	if err := r.db.Save(&existingMessage).Error; err != nil {
-		return Message{}, err
+	return message, nil
+}
+
+func (r *messageRepository) UpdateMessageByID(id uint, message Message) (Message, error) {
+	var existingMessage Message // В этой переменной храним существующее сообщение из БД
+
+	// Ищем существующее сообщение в БД по заданному id
+	result := r.db.First(&existingMessage, id)
+	if result.Error != nil {
+		return Message{}, result.Error
 	}
+	// Обозначем поля, которые будем обновлять
+	updates := map[string]interface{}{
+		"Message": message.Message,
+	}
+	// Обновляем запись в БД, в соответствие заданному id
+	result = r.db.Model(&Message{}).Where("id = ?", id).Updates(updates)
+	if result.Error != nil {
+		return Message{}, result.Error
+	}
+
+	// Обновляем existingMessage, чтобы вернуть актуальные данные
+	result = r.db.First(&existingMessage, id)
+	if result.Error != nil {
+		return Message{}, result.Error
+	}
+
 	return existingMessage, nil
 }
 
-// Удаление сообщения по ID
-func (r *messageRepository) DeleteMessageByID(id int) error {
-	if err := r.db.Delete(&Message{}, id).Error; err != nil {
-		return err
+func (r *messageRepository) DeleteMessageByID(id uint) (Message, error) {
+	var message Message
+	deletedMessage := r.db.First(&message, id)
+	if deletedMessage.Error != nil {
+		return Message{}, deletedMessage.Error
 	}
-	return nil
+
+	deletedMessage = r.db.Delete(&message, id)
+	if deletedMessage.Error != nil {
+		return Message{}, deletedMessage.Error
+	}
+	return message, nil
 }

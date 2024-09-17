@@ -36,11 +36,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
     patch:
-      summary: Update an existing message
+      summary: Update a message
       tags:
         - messages
       requestBody:
-        description: The update message data
+        description: The message to update
         required: true
         content:
           application/json:
@@ -57,25 +57,28 @@ paths:
       summary: Delete a message
       tags:
         - messages
-      parameters:
-        - name: id
-          in: query
-          required: true
-          schema:
-            type: integer
-            format: uint
-      responses:
-        '204':
-          description: Message successfully deleted
-  /users:
-    get:
-      tags:
-        - users
-      summary: Get all users
-      operationId: getUsers
+      requestBody:
+        description: The message to delete
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Message'
       responses:
         '200':
-          description: OK
+          description: The deleted message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+  /users:
+    get:
+      summary: Get all users
+      tags:
+        - users
+      responses:
+        '200':
+          description: A list of users
           content:
             application/json:
               schema:
@@ -83,11 +86,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/User'
     post:
+      summary: Create a new user
       tags:
         - users
-      summary: Create a new user
-      operationId: postUser
       requestBody:
+        description: The user to create
         required: true
         content:
           application/json:
@@ -95,24 +98,17 @@ paths:
               $ref: '#/components/schemas/User'
       responses:
         '201':
-          description: Created
+          description: The created user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-  /users/{id}:
     patch:
+      summary: Update a user
       tags:
         - users
-      summary: Update a user by ID
-      operationId: patchUserById
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
       requestBody:
+        description: The user to update
         required: true
         content:
           application/json:
@@ -120,26 +116,29 @@ paths:
               $ref: '#/components/schemas/User'
       responses:
         '200':
-          description: OK
+          description: The updated user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
     delete:
+      summary: Delete a user
       tags:
         - users
-      summary: Delete a user by ID
-      operationId: deleteUserById
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
+      requestBody:
+        description: The user to update
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
       responses:
-        '204':
-          description: No Content
-
+        '200':
+          description: The deleted user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
 components:
   schemas:
     Message:
@@ -147,7 +146,7 @@ components:
       properties:
         id:
           type: integer
-          format: uint
+          format: uint # так как в БД айди это только положительные числа.
         message:
           type: string
     User:
@@ -155,7 +154,7 @@ components:
       properties:
         id:
           type: integer
-          format: uint
+          format: uint # так как в БД айди это только положительные числа.
         email:
           type: string
         password:

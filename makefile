@@ -25,4 +25,4 @@ lint:
 	golangci-lint run --out-format=colored-line-number
 
 generate-users:
-	oapi-codegen -generate types,server,spec -o internal/handlers/users.go -package handlers openapi/openapi.yaml
+	oapi-codegen -generate types,server,spec -o internal/web2/users/users.go -package handlers openapi/openapi.yaml

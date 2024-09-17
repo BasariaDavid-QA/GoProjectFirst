@@ -1,5 +1,6 @@
 package database
 
+//noinspection ALL
 import (
 	"log"
 
@@ -7,14 +8,27 @@ import (
 	"gorm.io/gorm"
 )
 
+// переменная, через которую мы будем работать с БД
 var DB *gorm.DB
 
+type Message struct {
+	gorm.Model
+	Message string `json:"Message"`
+}
+
+type User struct {
+	gorm.Model
+	Email    string `json:"Email"`
+	Password string `json:"Password"`
+}
+
 func InitDB() {
-	// Настройки подключения к базе данных
+	// в dsn вводим данные, которые мы указали при создании контейнера
 	dsn := "host=localhost user=postgres password=Vasaner12 dbname=postgres port=5432 sslmode=disable"
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database: ", err)
 	}
+
 }
